@@ -1,43 +1,49 @@
-# Analisis Step 06: Functional Testing
+# Analisis Step 07: View Decorators
 
 ## Apa yang Dilakukan?
-Pada langkah ini, kita menambahkan *library* `webtest` ke dalam dependensi pengembangan (`[dev]`) kita. Kita kemudian **memperluas** file `tutorial/tests.py` kita untuk menyertakan *functional test* baru (`TutorialFunctionalTests`) di samping *unit test* (`TutorialViewTests`) yang sudah ada.
+Pada langkah ini, kita melakukan *refactor* (penataan ulang kode) yang signifikan. Kita memindahkan kode *view* (logika yang menangani *request*) dari file `tutorial/__init__.py` ke file baru yang didedikasikan untuk itu, yaitu `tutorial/views.py`.
 
-*Test* baru ini memverifikasi bahwa *keseluruhan* aplikasi kita (bukan hanya satu fungsi) merespons dengan benar ke permintaan web.
+Kita juga beralih dari konfigurasi *imperative* (menggunakan `config.add_view`) ke konfigurasi *declarative* (menggunakan decorator `@view_config`).
 
 ## Konsep
 
-1.  **Unit Test vs. Functional Test**:
-    * **Unit Test** (yang lama): `TutorialViewTests` menguji satu "unit" kode (fungsi `hello_world`) secara terisolasi. Kita menggunakan `pyramid.testing.DummyRequest` (permintaan palsu) untuk ini.
-    * **Functional Test** (yang baru): `TutorialFunctionalTests` menguji *seluruh* aplikasi. Ini mensimulasikan *browser* nyata yang membuat permintaan HTTP ke aplikasi WSGI kita dan memeriksa responsnya.
+1.  **Refactoring ke `views.py`**:
+    File `__init__.py` kita sekarang jauh lebih bersih. Tanggung jawabnya sekarang hanya untuk membuat `Configurator`, menambahkan *routes* (rute), dan memindai *views*. Logika *view* yang sebenarnya (fungsi `home` dan `hello`) sekarang berada di file `views.py` mereka sendiri.
 
-2.  **`webtest` (`TestApp`)**:
-    Ini adalah *library* kunci untuk *functional testing*.
-    * `from webtest import TestApp`: Kita mengimpor "browser" palsu.
-    * `app = main({})`: Di dalam `setUp`, kita mengimpor dan memanggil fungsi `main` dari `__init__.py` untuk membangun *seluruh* aplikasi Pyramid kita.
-    * `self.testapp = TestApp(app)`: Kita menginisialisasi `TestApp` dengan aplikasi Pyramid kita yang sudah jadi.
+2.  **`config.scan('.views')`**:
+    Ini adalah perintah baru yang penting di `__init__.py`. Perintah ini memberi tahu Pyramid untuk "memindai" (scan) file `views.py` (dan file lain di *package* yang sama) untuk mencari *decorator* konfigurasi.
 
-3.  **Menjalankan Functional Test**:
-    * `res = self.testapp.get('/', status=200)`: Ini adalah *test* yang sebenarnya. `self.testapp.get` bertindak seperti *browser* yang mengunjungi URL `/`. Parameter `status=200` berarti *test* ini akan otomatis **gagal** jika status responsnya bukan 200 (OK).
-    * `self.assertIn(b'<h1>Hello World!</h1>', res.body)`: Ini adalah apa yang kita diskusikan di *step* sebelumnya! Di sini, kita benar-benar memeriksa **isi (body)** dari respons HTML untuk memastikan bahwa teks `<h1>Hello World!</h1>` (sebagai `bytes`, ditandai `b'...'`) ada di dalamnya.
+3.  **Declarative (`@view_config`) vs. Imperative (`add_view`)**:
+    * **Imperative (Cara Lama)**: Kita secara manual memberi tahu *configurator* apa yang harus dilakukan: `config.add_view(fungsi_hello, route_name='hello')`.
+    * **Declarative (Cara Baru)**: Kita "mendekorasi" fungsi *view* kita dengan `@view_config(route_name='hello')`. Ketika `config.scan('.views')` dijalankan, Pyramid akan menemukan *decorator* ini dan secara otomatis melakukan hal yang sama seperti `add_view`.
 
-4.  **`pytest`**:
-    `pytest` cukup pintar untuk secara otomatis menemukan *kedua* *class* tes (`TutorialViewTests` dan `TutorialFunctionalTests`) di dalam file `tests.py` dan menjalankan semua metode `test_...` di dalam keduanya. Inilah sebabnya kita sekarang melihat "2 passed".
+    Kedua pendekatan ini menghasilkan konfigurasi akhir yang sama. Ini sebagian besar masalah selera dan keterbacaan. Konfigurasi *declarative* menjaga konfigurasi *view* tetap berada di samping kode *view* itu sendiri, yang seringkali lebih mudah dibaca.
+
+4.  **Memperbarui Tests**:
+    Karena *views* kita sekarang ada di `views.py` dan konten HTML-nya berubah (menjadi tautan `<a>`), kita harus memperbarui `tests.py` secara signifikan.
+    * Kita mengubah *unit test* untuk mengimpor dari `.views` dan memeriksa konten baru (misal `b'Visit'`).
+    * Kita mengubah *functional test* untuk menguji URL baru (`/howdy`) dan memeriksa konten baru.
+    * Inilah sebabnya `pytest` sekarang menemukan dan meluluskan **4 tes**.
 
 ## Cara Menjalankan
 
-Langkah ini tidak menjalankan server web. Langkah ini menjalankan *tests*.
-
 1.  Pastikan *virtual environment* (`env`) sudah aktif.
-2.  Masuk ke direktori `06-functional-testing`.
-3.  Install `webtest` (dependensi `[dev]` baru) dengan meng-install ulang proyek:
-    ```bash
-    pip install -e ".[dev]"
-    ```
-4.  Jalankan *test runner* `pytest` (ini akan menjalankan 2 tes):
+2.  Masuk ke direktori `07-view-decorators`.
+3.  Install ulang proyek: `pip install -e .`
+4.  Jalankan *test suite* (sekarang ada 4 tes):
     ```bash
     pytest tutorial/tests.py -q -W ignore
     ```
+5.  Jalankan server:
+    ```bash
+    pserve development.ini --reload
+    ```
+6.  Buka *browser* dan kunjungi `http://localhost:6543/` dan `http://localhost:6543/howdy`.
 
 ## Bukti Screenshot
+
+1.  Terminal yang menjalankan `pytest` dengan pesan bersih "4 passed".
 ![alt text](image.png)
+2.  Browser yang menampilkan salah satu halaman baru (misal `http://localhost:6543/howdy`).
+![alt text](image-1.png)
+![alt text](image-2.png)
